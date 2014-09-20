@@ -141,11 +141,19 @@
       "target/cancer.png")
     (save-chart
       (let [x-serie (range (count functionals))
-            y-serie functionals]
-        (-> (incanter.charts/line-chart x-serie y-serie
-             :title "Функціонали"
-             :x-label "N"
-             :y-label "Значення функціоналу")))
+            y-serie (map :val functionals)
+            categories [:B :R :G :H]
+            chart (incanter.charts/line-chart
+                   x-serie y-serie
+                   :legend true
+                   :title "Функціонали"
+                   :x-label "N"
+                   :y-label "Значення функціоналу")]
+        (doseq [category categories]
+          (incanter.charts/add-categories chart
+           x-serie (map category functionals)
+           :series-label (str (name category) " компонента")))
+        chart)
       "target/cancer-functionals.png" )))
 
 (defn build-dataset [dataset]

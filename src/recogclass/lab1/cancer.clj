@@ -72,7 +72,8 @@
         H (calc-functional-H mst-graph)
         G (calc-functional-G initial-graph mst-graph new-removed-edges)
         R (calc-functional-R mst-graph)]
-    (Math/log (/ (* D H) G R))))
+    {:D D :H H :G G :R R
+     :val (Math/log (/ (* D H) G R))}))
 
 (defn cancer
   "Splits graph vectors to groups and returns three element vector:
@@ -87,16 +88,17 @@
       (let [max-edge (utils/get-max-edge mst-graph)
             new-mst-graph (loom.graph/remove-edges mst-graph max-edge)
             new-removed-edges (conj removed-edges max-edge)
-            old-functional-val (last functionals)
-            new-functional-val (calc-functional initial-loom-graph
-                                                mst-graph
-                                                new-removed-edges)]
-        (if (or (nil? old-functional-val)
-                (> new-functional-val old-functional-val))
+            old-functional (last functionals)
+            new-functional (calc-functional initial-loom-graph
+                                            mst-graph
+                                            new-removed-edges)
+            new-functionals (conj functionals new-functional)]
+        (if (or (nil? old-functional)
+                (> (new-functional :val) (old-functional :val)))
           (recur
              new-mst-graph
              new-removed-edges
-             (conj functionals new-functional-val))
+             new-functionals)
           [(map set (loom.alg/connected-components mst-graph))
            (loom.graph/edges mst-graph)
-           (conj functionals new-functional-val)])))))
+           new-functionals])))))
