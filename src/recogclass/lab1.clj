@@ -158,15 +158,23 @@
   [chart file]
   (incanter.core/save chart file :width 1280 :height 720))
 
+(defn- annotate-scatter-chart-with-names!
+  [chart property-matrix]
+  (do
+    (doseq [[id x y] property-matrix]
+      (incanter.charts/add-pointer chart x y :text id :angle :se))
+    chart))
+
 (defn build-initial
   [property-matrix]
   (save-chart
-   (incanter.charts/scatter-plot
-    (map second property-matrix)
-    (map #(get % 2) property-matrix)
-    :title "Початкові дані"
-    :x-label "Відсоток з усіма атестаціями"
-    :y-label "Відсоток з 3ма неатестаціями")
+   (-> (incanter.charts/scatter-plot
+        (map second property-matrix)
+        (map #(get % 2) property-matrix)
+        :title "Початкові дані"
+        :x-label "Відсоток з усіма атестаціями"
+        :y-label "Відсоток з 3ма неатестаціями")
+       (annotate-scatter-chart-with-names! property-matrix))
    "target/scatter.png"))
 
 (defn build-spectr
@@ -187,12 +195,14 @@
         groups-count (count cancer-result)]
     (save-chart
      (let [x-serie (map second property-matrix)
-           y-serie (map #(get % 2) property-matrix)]
-       (incanter.charts/scatter-plot x-serie y-serie
-        :title (format "Результати алгоритму КРАБ (%d групи)" groups-count)
-        :x-label "Відсоток з усіма атестаціями"
-        :y-label "Відсоток з 3ма неатестаціями"
-        :group-by (map #(get-group-number cancer-result (first %)) property-matrix)))
+           y-serie (map #(get % 2) property-matrix)
+           group-by-serie (map #(get-group-number cancer-result (first %)) property-matrix)]
+       (-> (incanter.charts/scatter-plot x-serie y-serie
+            :title (format "Результати алгоритму КРАБ (%d групи)" groups-count)
+            :x-label "Відсоток з усіма атестаціями"
+            :y-label "Відсоток з 3ма неатестаціями"
+            :group-by group-by-serie)
+           (annotate-scatter-chart-with-names! property-matrix)))
      "target/cancer.png")))
 
 (defn build [dataset]
