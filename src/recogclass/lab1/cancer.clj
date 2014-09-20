@@ -17,8 +17,20 @@
      (count removed-edges)))
 
 (defn- calc-functional-H
-  [loom-graph]
-  1)
+  [mst-graph]
+  (let [total-vertex-count (count (loom.graph/nodes mst-graph))
+        groups (utils/get-graph-groups mst-graph)
+        groups-count (count groups)
+        average-vertexes-per-group (Math/ceil (/ total-vertex-count groups-count))]
+    (if (= groups-count 1)
+      (throw (ex-info "Can not calculate H component for graph with 1 group" {}))
+      (apply * (for [group groups
+                     :let [group-vertex-count (count group)
+                           ratio (/ group-vertex-count total-vertex-count)]]
+                 (->> (double (/ group-vertex-count total-vertex-count))
+                      (- 1)
+                      (Math/abs)
+                      (- 1)))))))
 
 (defn- get-min-group-neigh
   "Returns smallest edge which is neighbor to current edge
@@ -90,7 +102,7 @@
             new-removed-edges (conj removed-edges max-edge)
             old-functional (last functionals)
             new-functional (calc-functional initial-loom-graph
-                                            mst-graph
+                                            new-mst-graph
                                             new-removed-edges)
             new-functionals (conj functionals new-functional)]
         (if (or (nil? old-functional)
