@@ -1,5 +1,6 @@
 (ns recogclass.lab1.cancer
-  (:require [loom.alg]
+  (:require [clojure.set :as set]
+            [loom.alg]
             [loom.graph]
             [recogclass.lab1.utils :as utils]))
 
@@ -19,9 +20,33 @@
   [loom-graph]
   1)
 
+(defn- get-min-group-neigh
+  "Returns smallest edge which is neighbor to current edge
+  and connects vertexes of same group.
+  Can return nil of group has no edges within."
+  [current-edge mst-graph removed-edges]
+  (let [current-edge (set current-edge)
+        removed-edges (set (map set removed-edges))]
+    (->> (loom.alg/distinct-edges mst-graph)
+         (map set)
+         ; Get direct edges-neighbors
+         (filter #(not (empty? (set/intersection % current-edge))))
+         ; Get edges which are in some group (simply not in removed edges)
+         (filter #(not (contains? removed-edges %)))
+         (map vec)
+         (sort-by #(loom.graph/weight mst-graph %))
+         (first))))
+
+
+
 (defn- calc-functional-G
-  [mst-graph removed-edges]
-  (/ 1
+  [initial-graph mst-graph removed-edges]
+  (/ (apply + (for [edge removed-edges
+                    :let [min-neigh (get-min-group-neigh edge mst-graph removed-edges)]
+                    ; Some vertexes may not have connected edges
+                    :when (not (nil? min-neigh))]
+                (/ (loom.graph/weight mst-graph min-neigh)
+                   (loom.graph/weight initial-graph edge))))
      (count removed-edges)))
 
 
@@ -45,7 +70,7 @@
   [initial-graph mst-graph new-removed-edges]
   (let [D (calc-functional-D initial-graph new-removed-edges)
         H (calc-functional-H mst-graph)
-        G (calc-functional-G mst-graph new-removed-edges)
+        G (calc-functional-G initial-graph mst-graph new-removed-edges)
         R (calc-functional-R mst-graph)]
     (Math/log (/ (* D H) G R))))
 

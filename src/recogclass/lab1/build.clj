@@ -5,7 +5,7 @@
   (:require [clojure.edn :as edn]
             [incanter.core]
             [incanter.charts]
-            [recogclass.lab1.cancer :refer [cancer]]
+            [recogclass.lab1.cancer :refer [cancer] :reload true]
             [recogclass.lab1.spectr :refer [spectr]]
             [recogclass.lab1.utils :as utils]))
 
