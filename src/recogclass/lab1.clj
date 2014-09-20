@@ -154,9 +154,13 @@
 ;; Results builders
 ;;
 
+(defn- save-chart
+  [chart file]
+  (incanter.core/save chart file :width 1280 :height 720))
+
 (defn build-initial
   [property-matrix]
-  (incanter.core/save
+  (save-chart
    (incanter.charts/scatter-plot
     (map second property-matrix)
     (map #(get % 2) property-matrix)
@@ -168,7 +172,7 @@
 (defn build-spectr
   [distance-map]
   (let [spectr-result (spectr distance-map)]
-    (incanter.core/save
+    (save-chart
      (incanter.charts/line-chart
       (map first spectr-result)
       (map second spectr-result)
@@ -181,7 +185,7 @@
   [property-matrix distance-graph]
   (let [cancer-result (cancer distance-graph)
         groups-count (count cancer-result)]
-    (incanter.core/save
+    (save-chart
      (let [x-serie (map second property-matrix)
            y-serie (map #(get % 2) property-matrix)]
        (incanter.charts/scatter-plot x-serie y-serie
