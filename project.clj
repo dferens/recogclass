@@ -5,4 +5,5 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [incanter/incanter-charts "1.5.5"]
                  [aysylu/loom "0.5.0"]]
-  :plugins [[lein-autoreload "0.1.0"]])
+  :plugins [[lein-autoreload "0.1.0"]]
+  :jvm-opts ["-XX:-OmitStackTraceInFastThrow"])
