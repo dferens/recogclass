@@ -1,5 +1,6 @@
 (ns recogclass.lab1.utils
   (:require [clojure.set :as set]
+            [loom.alg]
             [loom.graph]))
 
 
@@ -29,8 +30,9 @@
           (recur (inc group-index)))))))
 
 (defn get-group-edges
+  "Returns collection of unique group's edges of undirected graph"
   [loom-graph group]
-  (->> (loom.graph/edges loom-graph)
+  (->> (loom.alg/distinct-edges loom-graph)
        (filter #(not (empty? (set/intersection (apply hash-set %) group))))))
 
 

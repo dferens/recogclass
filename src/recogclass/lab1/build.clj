@@ -125,20 +125,28 @@
 
 (defn build-cancer
   [property-matrix distance-graph]
-  (let [[cancer-groups cancer-edges] (cancer distance-graph)
+  (let [[cancer-groups cancer-edges functionals] (cancer distance-graph)
         groups-count (count cancer-groups)]
     (save-chart
-     (let [x-serie (map second property-matrix)
-           y-serie (map #(get % 2) property-matrix)
-           group-by-serie (map #(utils/get-group-number cancer-groups (first %)) property-matrix)]
-       (-> (incanter.charts/scatter-plot x-serie y-serie
-            :title (format "Результати алгоритму КРАБ (%d групи)" groups-count)
-            :x-label "Відсоток з усіма атестаціями"
-            :y-label "Відсоток з 3ма неатестаціями"
-            :group-by group-by-serie)
-           (annotate-scatter-chart-with-names! property-matrix)
-           (annotate-chart-with-edges! cancer-edges property-matrix)))
-     "target/cancer.png")))
+      (let [x-serie (map second property-matrix)
+            y-serie (map #(get % 2) property-matrix)
+            group-by-serie (map #(utils/get-group-number cancer-groups (first %)) property-matrix)]
+        (-> (incanter.charts/scatter-plot x-serie y-serie
+             :title (format "Результати алгоритму КРАБ (кількість груп: %d)" groups-count)
+             :x-label "Відсоток з усіма атестаціями"
+             :y-label "Відсоток з 3ма неатестаціями"
+             :group-by group-by-serie)
+            (annotate-scatter-chart-with-names! property-matrix)
+            (annotate-chart-with-edges! cancer-edges property-matrix)))
+      "target/cancer.png")
+    (save-chart
+      (let [x-serie (range (count functionals))
+            y-serie functionals]
+        (-> (incanter.charts/line-chart x-serie y-serie
+             :title "Функціонали"
+             :x-label "N"
+             :y-label "Значення функціоналу")))
+      "target/cancer-functionals.png" )))
 
 (defn build-dataset [dataset]
   (let [property-matrix (dataset->property-matrix dataset)
