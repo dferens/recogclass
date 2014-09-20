@@ -1,36 +1,21 @@
-(ns recogclass.lab1
+(ns recogclass.lab1.build
   (:import java.awt.Color
            java.awt.BasicStroke
            org.jfree.chart.annotations.XYLineAnnotation)
   (:require [clojure.edn :as edn]
             [incanter.core]
             [incanter.charts]
-            [incanter.datasets]
-            [loom.io]
-            [loom.alg]
-            [loom.graph]))
+            [recogclass.lab1.cancer :refer [cancer]]
+            [recogclass.lab1.spectr :refer [spectr]]
+            [recogclass.lab1.utils :as utils]))
 
 ;;
-;; Utilities
+;; Dataset transformations
 ;;
 
-(defn calc-decart-distance
-  "Calculates Decart distance of two vectors"
-  [vec-a vec-b]
-  (->> (map #(Math/pow (- %1 %2) 2) vec-a vec-b)
-       (reduce +)
-       (Math/sqrt)))
-
-(defn get-group-number
-  "Accepts collection of sets (groups) and value, returns group index
-   which contains given value"
-  [groups value]
-  (loop [group-index 0]
-    (let [group (nth groups group-index)]
-      (when (not (nil? group))
-        (if (contains? group value)
-          group-index
-          (recur (inc group-index)))))))
+(defn load-dataset
+  [dataset-file-path]
+  (edn/read-string (slurp dataset-file-path)))
 
 (defn dataset->property-matrix
   "Returns list of vectors (table) with 3 elements:
@@ -43,13 +28,6 @@
      (get-in dataset [:has-full-atestations faculty-id])
      (get-in dataset [:has-no-three-atestations faculty-id])]))
 
-(defn get-faculty-properties
-  [property-matrix faculty-id]
-  (->> property-matrix
-       (filter #(= (first %) faculty-id))
-       (first)
-       (rest)))
-
 (defn property-matrix->distance-matrix
   "Returns matrix [N*N x 3]:
   [[faculty1-id faculty1-id 0.000]
@@ -61,7 +39,7 @@
         record-b property-matrix
         :let [id-a (first record-a) vec-a (rest record-a)
               id-b (first record-b) vec-b (rest record-b)]]
-    [id-a id-b (calc-decart-distance vec-a vec-b)]))
+    [id-a id-b (utils/calc-decart-distance vec-a vec-b)]))
 
 (defn distance-matrix->distance-map
   "Converts distance matrix to map like:
@@ -89,85 +67,15 @@
       [start-element iter-element distance])))
 
 ;;
-;; Spectr algorithm
-;;
-
-(defn- calc-spectr-value
-  [element b-seq distance-map]
-  (* (/ 1 (count b-seq))
-     (apply + (for [b-element b-seq]
-                (get-in distance-map [element b-element])))))
-(defn spectr
-  [distance-map]
-  (let [elements (keys distance-map)]
-    (loop [elements (rest elements)
-           b-seq [(first elements)]
-           spectr-seq []]
-      (if (empty? elements)
-        (map vector b-seq spectr-seq)
-        (let [func #(hash-map :id % :val (calc-spectr-value % b-seq distance-map))
-              closest-element (last (sort-by :val (map func elements)))]
-          (recur
-           (remove #{(closest-element :id)} elements)
-           (conj b-seq (closest-element :id))
-           (conj spectr-seq (closest-element :val))))))))
-
-;;
-;; Cancer algoritm (ffs ....)
-;;
-
-(defn cancer-functional-D
-  [loom-graph]
-  (rand-int 10))
-
-(defn cancer-functional-H
-  [loom-graph]
-  1)
-
-(defn cancer-functional-G
-  [loom-graph]
-  1)
-
-(defn cancer-functional-R
-  [loom-graph]
-  1)
-
-(defn cancer-functional
-  [loom-graph]
-  (Math/log (* (cancer-functional-D loom-graph)
-               (cancer-functional-H loom-graph)
-               (/ 1 (cancer-functional-G loom-graph))
-               (/ 1 (cancer-functional-R loom-graph)))))
-
-(defn get-max-edge
-  [loom-graph]
-  (->> (loom.graph/edges loom-graph)
-       (sort-by #(loom.graph/weight loom-graph %))
-       (last)))
-
-(defn cancer
-  "Splits graph vectors to groups and returns two element vector:
-   [({:one} {:two :tree} ...) - collection of sets of vectors
-    ([:one :two] [:one :three] ...) - collection of graph edges left]"
-  [distance-graph]
-  (let [initial-loom-graph (apply loom.graph/weighted-graph distance-graph)
-        loom-mst-graph (loom.alg/prim-mst initial-loom-graph)]
-    (loop [loom-graph loom-mst-graph
-           old-functional-val -99999]
-      (let [max-edge (get-max-edge loom-graph)
-            new-loom-graph (loom.graph/remove-edges loom-graph max-edge)
-            new-functional-val (cancer-functional new-loom-graph)]
-        (if (> new-functional-val old-functional-val)
-          (recur new-loom-graph new-functional-val)
-          (identity
-           [(->> loom-graph
-                 (loom.alg/connected-components)
-                 (map set))
-            (loom.graph/edges loom-graph)]))))))
-
-;;
 ;; Results builders
 ;;
+
+(defn get-faculty-properties
+  [property-matrix faculty-id]
+  (->> property-matrix
+       (filter #(= (first %) faculty-id))
+       (first)
+       (rest)))
 
 (defn- save-chart
   [chart file]
@@ -190,7 +98,6 @@
                     (.addAnnotation (.getXYPlot chart) annotation)
                     chart))]
     (reduce reducer chart edges)))
-
 
 (defn build-initial
   [property-matrix]
@@ -223,7 +130,7 @@
     (save-chart
      (let [x-serie (map second property-matrix)
            y-serie (map #(get % 2) property-matrix)
-           group-by-serie (map #(get-group-number cancer-groups (first %)) property-matrix)]
+           group-by-serie (map #(utils/get-group-number cancer-groups (first %)) property-matrix)]
        (-> (incanter.charts/scatter-plot x-serie y-serie
             :title (format "Результати алгоритму КРАБ (%d групи)" groups-count)
             :x-label "Відсоток з усіма атестаціями"
@@ -233,7 +140,7 @@
            (annotate-chart-with-edges! cancer-edges property-matrix)))
      "target/cancer.png")))
 
-(defn build [dataset]
+(defn build-dataset [dataset]
   (let [property-matrix (dataset->property-matrix dataset)
         distance-matrix (property-matrix->distance-matrix property-matrix)
         distance-map (distance-matrix->distance-map distance-matrix)
@@ -243,7 +150,6 @@
     (build-spectr distance-map)
     (build-cancer property-matrix distance-graph)))
 
-(def dataset
-  (edn/read-string (slurp "resources/lab1/faculties.edn")))
-
-(build dataset)
+(-> "resources/lab1/faculties.edn"
+    (load-dataset)
+    (build-dataset))
