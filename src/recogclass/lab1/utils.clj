@@ -32,3 +32,11 @@
   [loom-graph group]
   (->> (loom.graph/edges loom-graph)
        (filter #(not (empty? (set/intersection (apply hash-set %) group))))))
+
+
+(defn get-graph-groups
+  "Returns collection of sets of graph vertexes:
+   (#{:one} #{:two :three} ...)"
+  [loom-graph]
+  (->> (loom.alg/connected-components loom-graph)
+       (map #(apply hash-set %))))
