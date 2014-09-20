@@ -1,5 +1,6 @@
 (ns recogclass.lab1.utils
-  (:require loom.graph))
+  (:require [clojure.set :as set]
+            [loom.graph]))
 
 
 (defn calc-decart-distance
@@ -26,3 +27,8 @@
         (if (contains? group value)
           group-index
           (recur (inc group-index)))))))
+
+(defn get-group-edges
+  [loom-graph group]
+  (->> (loom.graph/edges loom-graph)
+       (filter #(not (empty? (set/intersection (apply hash-set %) group))))))

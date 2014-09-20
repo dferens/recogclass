@@ -150,6 +150,6 @@
     (build-spectr distance-map)
     (build-cancer property-matrix distance-graph)))
 
-(-> "resources/lab1/faculties.edn"
-    (load-dataset)
-    (build-dataset))
+(def dataset (load-dataset "resources/lab1/faculties.edn"))
+
+(build-dataset dataset)
