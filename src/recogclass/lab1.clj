@@ -1,4 +1,7 @@
 (ns recogclass.lab1
+  (:import java.awt.Color
+           java.awt.BasicStroke
+           org.jfree.chart.annotations.XYLineAnnotation)
   (:require [clojure.edn :as edn]
             [incanter.core]
             [incanter.charts]
@@ -39,6 +42,13 @@
     [faculty-id
      (get-in dataset [:has-full-atestations faculty-id])
      (get-in dataset [:has-no-three-atestations faculty-id])]))
+
+(defn get-faculty-properties
+  [property-matrix faculty-id]
+  (->> property-matrix
+       (filter #(= (first %) faculty-id))
+       (first)
+       (rest)))
 
 (defn property-matrix->distance-matrix
   "Returns matrix [N*N x 3]:
@@ -136,6 +146,9 @@
        (last)))
 
 (defn cancer
+  "Splits graph vectors to groups and returns two element vector:
+   [({:one} {:two :tree} ...) - collection of sets of vectors
+    ([:one :two] [:one :three] ...) - collection of graph edges left]"
   [distance-graph]
   (let [initial-loom-graph (apply loom.graph/weighted-graph distance-graph)
         loom-mst-graph (loom.alg/prim-mst initial-loom-graph)]
@@ -146,9 +159,11 @@
             new-functional-val (cancer-functional new-loom-graph)]
         (if (> new-functional-val old-functional-val)
           (recur new-loom-graph new-functional-val)
-          (->> loom-graph
-               (loom.alg/connected-components)
-               (map set)))))))
+          (identity
+           [(->> loom-graph
+                 (loom.alg/connected-components)
+                 (map set))
+            (loom.graph/edges loom-graph)]))))))
 
 ;;
 ;; Results builders
@@ -160,10 +175,22 @@
 
 (defn- annotate-scatter-chart-with-names!
   [chart property-matrix]
-  (do
-    (doseq [[id x y] property-matrix]
-      (incanter.charts/add-pointer chart x y :text id :angle :se))
-    chart))
+  (let [reducer (fn [chart [id x y]]
+                  (incanter.charts/add-pointer chart x y :text id :angle :se))]
+    (reduce reducer chart property-matrix)))
+
+(defn- annotate-chart-with-edges!
+  [chart edges property-matrix]
+  (let [stroke (new BasicStroke 2.0)
+        paint (new Color (rand-int 256) (rand-int 256) (rand-int 256))
+        reducer (fn [chart [fac-id-1 fac-id-2]]
+                  (let [[x1 y1] (get-faculty-properties property-matrix fac-id-1)
+                        [x2 y2] (get-faculty-properties property-matrix fac-id-2)
+                        annotation (new XYLineAnnotation x1 y1 x2 y2 stroke paint)]
+                    (.addAnnotation (.getXYPlot chart) annotation)
+                    chart))]
+    (reduce reducer chart edges)))
+
 
 (defn build-initial
   [property-matrix]
@@ -191,18 +218,19 @@
 
 (defn build-cancer
   [property-matrix distance-graph]
-  (let [cancer-result (cancer distance-graph)
-        groups-count (count cancer-result)]
+  (let [[cancer-groups cancer-edges] (cancer distance-graph)
+        groups-count (count cancer-groups)]
     (save-chart
      (let [x-serie (map second property-matrix)
            y-serie (map #(get % 2) property-matrix)
-           group-by-serie (map #(get-group-number cancer-result (first %)) property-matrix)]
+           group-by-serie (map #(get-group-number cancer-groups (first %)) property-matrix)]
        (-> (incanter.charts/scatter-plot x-serie y-serie
             :title (format "Результати алгоритму КРАБ (%d групи)" groups-count)
             :x-label "Відсоток з усіма атестаціями"
             :y-label "Відсоток з 3ма неатестаціями"
             :group-by group-by-serie)
-           (annotate-scatter-chart-with-names! property-matrix)))
+           (annotate-scatter-chart-with-names! property-matrix)
+           (annotate-chart-with-edges! cancer-edges property-matrix)))
      "target/cancer.png")))
 
 (defn build [dataset]
