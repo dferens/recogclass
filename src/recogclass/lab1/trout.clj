@@ -94,15 +94,27 @@
           new-sphere-center (calc-points-mass-center current-points-inside-lookup)
           new-sphere (->Sphere new-sphere-center (:radius current-sphere))
           new-points-inside-lookup (get-points-inside new-sphere points-lookup)]
-      (if (= (-> current-points-inside-lookup keys set)
-             (-> new-points-inside-lookup keys set))
-        [new-sphere new-points-inside-lookup]
-        (recur new-sphere)))))
+      (if (empty? new-points-inside-lookup)
+        [current-sphere current-points-inside-lookup]
+        (if (= (-> current-points-inside-lookup keys set)
+               (-> new-points-inside-lookup keys set))
+          [new-sphere new-points-inside-lookup]
+          (do
+            (prn current-points-inside-lookup new-points-inside-lookup)
+            (prn current-sphere new-sphere)
+            (recur new-sphere)))))))
 
 (defn trout
-  [property-matrix]
+  "Splits input objects into groups using trout algorithm.
+  Returns results map:
+  {:initial-sphere - initial sphere which contains all objects
+   :spheres-built - collection of produced spheres:
+    {:sphere - actual `Sphere` record, map with :center and :radius keys
+     :separates - set of object ids which given sphere contains}"
+  [property-matrix radius-ratio]
   (let [points-lookup (property-matrix->points-lookup property-matrix)
-        initial-sphere (get-sphere-of-points points-lookup)]
+        initial-sphere (get-sphere-of-points points-lookup)
+        search-sphere-radius (* radius-ratio (:radius initial-sphere))]
     (loop [spheres-built []
            points-left-lookup points-lookup]
       (if (empty? points-left-lookup)
@@ -110,8 +122,7 @@
          :spheres-built spheres-built}
         (let [current-start-sphere (get-sphere-of-points points-left-lookup)
               new-sphere-center (rand-point-inside current-start-sphere)
-              new-sphere-radius (* 0.9 (:radius current-start-sphere))
-              start-sphere (->Sphere new-sphere-center new-sphere-radius)
+              start-sphere (->Sphere new-sphere-center search-sphere-radius)
               [final-sphere final-points-inside-lookup]
               (get-final-trout-sphere start-sphere points-left-lookup)]
           (recur

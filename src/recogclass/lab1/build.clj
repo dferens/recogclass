@@ -96,15 +96,14 @@
     (reduce reducer chart edges)))
 
 (defn- annotate-chart-with-circles!
-  [chart circles]
+  [chart circles color]
   (doseq [{center :center radius :radius} circles]
     (let [height (* radius 2) width (* radius 2)
           top-left-x (- (first center) radius)
           top-left-y (- (second center) radius)
           shape (java.awt.geom.Ellipse2D$Double. top-left-x top-left-y width height)
           stroke (new BasicStroke 2.0)
-          outline-paint Color/BLUE
-          circle (new XYShapeAnnotation shape stroke outline-paint)]
+          circle (new XYShapeAnnotation shape stroke color)]
       (.addAnnotation (.getXYPlot chart) circle)))
   chart)
 
@@ -167,22 +166,26 @@
 
 (defn build-trout
   [property-matrix]
-  (let [{:keys [initial-sphere spheres-built]} (trout property-matrix)
-        circles (map :sphere spheres-built)
-        groups (map :separates spheres-built)
-        groups-count (count groups)
-        group-by-serie (map #(utils/get-group-number groups (first %)) property-matrix)]
-    (save-chart
-     (-> (incanter.charts/scatter-plot
-          (map second property-matrix)
-          (map #(get % 2) property-matrix)
-          :title (format "Результати алгоритму ФОРЕЛЬ (кількість груп: %d)" groups-count)
-          :x-label "Відсоток з усіма атестаціями"
-          :y-label "Відсоток з 3ма неатестаціями"
-          :group-by group-by-serie)
-         (annotate-scatter-chart-with-names! property-matrix)
-         (annotate-chart-with-circles! circles))
-     "target/trout.png")))
+  (doseq [ratio-string ["0.9" "0.6" "0.4"]]
+    (let [ratio (Float/parseFloat ratio-string)
+          {:keys [initial-sphere spheres-built]} (trout property-matrix ratio)
+          circles (map :sphere spheres-built)
+          groups (map :separates spheres-built)
+          groups-count (count groups)
+          group-by-serie (map #(utils/get-group-number groups (first %)) property-matrix)]
+      (save-chart
+       (-> (incanter.charts/scatter-plot
+            (map second property-matrix)
+            (map #(get % 2) property-matrix)
+            :title (format "Результати алгоритму ФОРЕЛЬ (кількість груп: %d, ratio: %f)"
+                           groups-count ratio)
+            :x-label "Відсоток з усіма атестаціями"
+            :y-label "Відсоток з 3ма неатестаціями"
+            :group-by group-by-serie)
+           (annotate-scatter-chart-with-names! property-matrix)
+           (annotate-chart-with-circles! [initial-sphere] Color/RED)
+           (annotate-chart-with-circles! circles Color/BLUE))
+       (format "target/trout-%s.png" ratio-string)))))
 
 (defn build-dataset [dataset]
   (let [property-matrix (dataset->property-matrix dataset)
