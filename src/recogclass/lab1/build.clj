@@ -10,6 +10,7 @@
             [recogclass.lab1.cancer :refer [cancer]]
             [recogclass.lab1.spectr :refer [spectr]]
             [recogclass.lab1.trout :refer [trout] :reload true]
+            [recogclass.lab1.prims :refer [prims] :reload true]
             [recogclass.lab1.utils :as utils :reload true]))
 
 ;;
@@ -77,7 +78,7 @@
   [chart file]
   (incanter.core/save chart file :width 1280 :height 720))
 
-(defn- annotate-scatter-chart-with-names!
+(defn- annotate-chart-with-names!
   [chart property-matrix]
   (let [reducer (fn [chart [id x y]]
                   (incanter.charts/add-pointer chart x y :text id :angle :se))]
@@ -107,6 +108,11 @@
       (.addAnnotation (.getXYPlot chart) circle)))
   chart)
 
+(defn get-x-y-series
+  [property-matrix]
+  [(map second property-matrix)
+   (map #(nth % 2) property-matrix)])
+
 (defn build-initial
   [property-matrix]
   (save-chart
@@ -116,7 +122,7 @@
         :title "Початкові дані"
         :x-label "Відсоток з усіма атестаціями"
         :y-label "Відсоток з 3ма неатестаціями")
-       (annotate-scatter-chart-with-names! property-matrix))
+       (annotate-chart-with-names! property-matrix))
    "target/scatter.png"))
 
 (defn build-spectr
@@ -136,23 +142,21 @@
   (let [[cancer-groups cancer-edges functionals] (cancer distance-graph)
         groups-count (count cancer-groups)]
     (save-chart
-      (let [x-serie (map second property-matrix)
-            y-serie (map #(get % 2) property-matrix)
+      (let [[x-serie y-serie] (get-x-y-series property-matrix)
             group-by-serie (map #(utils/get-group-number cancer-groups (first %)) property-matrix)]
         (-> (incanter.charts/scatter-plot x-serie y-serie
              :title (format "Результати алгоритму КРАБ (кількість груп: %d)" groups-count)
              :x-label "Відсоток з усіма атестаціями"
              :y-label "Відсоток з 3ма неатестаціями"
              :group-by group-by-serie)
-            (annotate-scatter-chart-with-names! property-matrix)
+            (annotate-chart-with-names! property-matrix)
             (annotate-chart-with-edges! cancer-edges property-matrix)))
       "target/cancer.png")
     (save-chart
       (let [x-serie (range (count functionals))
             y-serie (map :val functionals)
             categories [:D :R :G :H]
-            chart (incanter.charts/line-chart
-                   x-serie y-serie
+            chart (incanter.charts/line-chart x-serie y-serie
                    :legend true
                    :title "Функціонали"
                    :x-label "N"
@@ -171,21 +175,33 @@
           {:keys [initial-sphere spheres-built]} (trout property-matrix ratio)
           circles (map :sphere spheres-built)
           groups (map :separates spheres-built)
-          groups-count (count groups)
-          group-by-serie (map #(utils/get-group-number groups (first %)) property-matrix)]
+          group-by-serie (map #(utils/get-group-number groups (first %)) property-matrix)
+          [x-serie y-serie] (get-x-y-series property-matrix)]
       (save-chart
-       (-> (incanter.charts/scatter-plot
-            (map second property-matrix)
-            (map #(get % 2) property-matrix)
+       (-> (incanter.charts/scatter-plot x-serie y-serie
             :title (format "Результати алгоритму ФОРЕЛЬ (кількість груп: %d, ratio: %f)"
-                           groups-count ratio)
+                           (count groups) ratio)
             :x-label "Відсоток з усіма атестаціями"
             :y-label "Відсоток з 3ма неатестаціями"
             :group-by group-by-serie)
-           (annotate-scatter-chart-with-names! property-matrix)
+           (annotate-chart-with-names! property-matrix)
            (annotate-chart-with-circles! [initial-sphere] Color/RED)
            (annotate-chart-with-circles! circles Color/BLUE))
        (format "target/trout-%s.png" ratio-string)))))
+
+(defn build-prims
+  [property-matrix distance-graph]
+  (let [[x-serie y-serie] (get-x-y-series property-matrix)
+        mst-edges (loom.graph/edges (prims distance-graph))
+        _ (prn mst-edges)]
+    (save-chart
+      (-> (incanter.charts/scatter-plot x-serie y-serie
+           :title "Результати алгоритму Пріма"
+           :x-label "Відсоток з усіма атестаціями"
+           :y-label "Відсоток з 3ма неатестаціями")
+          (annotate-chart-with-names! property-matrix)
+          (annotate-chart-with-edges! mst-edges property-matrix))
+      "target/prims.png")))
 
 (defn build-dataset [dataset]
   (let [property-matrix (dataset->property-matrix dataset)
@@ -196,7 +212,8 @@
     (build-initial property-matrix)
     (build-spectr distance-map)
     (build-cancer property-matrix distance-graph)
-    (build-trout property-matrix)))
+    (build-trout property-matrix)
+    (build-prims property-matrix distance-graph)))
 
 (def dataset (load-dataset "resources/lab1/faculties.edn"))
 
