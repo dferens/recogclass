@@ -11,6 +11,13 @@
        (reduce +)
        (Math/sqrt)))
 
+(defn get-record-properties
+  [property-matrix record-id]
+  (->> property-matrix
+       (filter #(= (first %) record-id))
+       (first)
+       (rest)))
+
 (defn get-max-edge
   "Returns edge with max weight"
   [loom-graph]

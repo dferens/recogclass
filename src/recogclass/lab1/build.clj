@@ -1,13 +1,16 @@
 (ns recogclass.lab1.build
   (:import java.awt.Color
            java.awt.BasicStroke
-           org.jfree.chart.annotations.XYLineAnnotation)
+           java.awt.geom.Ellipse2D
+           org.jfree.chart.annotations.XYLineAnnotation
+           org.jfree.chart.annotations.XYShapeAnnotation)
   (:require [clojure.edn :as edn]
             [incanter.core]
             [incanter.charts]
             [recogclass.lab1.cancer :refer [cancer]]
             [recogclass.lab1.spectr :refer [spectr]]
-            [recogclass.lab1.utils :as utils]))
+            [recogclass.lab1.trout :refer [trout] :reload true]
+            [recogclass.lab1.utils :as utils :reload true]))
 
 ;;
 ;; Dataset transformations
@@ -70,13 +73,6 @@
 ;; Results builders
 ;;
 
-(defn get-faculty-properties
-  [property-matrix faculty-id]
-  (->> property-matrix
-       (filter #(= (first %) faculty-id))
-       (first)
-       (rest)))
-
 (defn- save-chart
   [chart file]
   (incanter.core/save chart file :width 1280 :height 720))
@@ -92,12 +88,25 @@
   (let [stroke (new BasicStroke 2.0)
         paint (new Color (rand-int 256) (rand-int 256) (rand-int 256))
         reducer (fn [chart [fac-id-1 fac-id-2]]
-                  (let [[x1 y1] (get-faculty-properties property-matrix fac-id-1)
-                        [x2 y2] (get-faculty-properties property-matrix fac-id-2)
+                  (let [[x1 y1] (utils/get-record-properties property-matrix fac-id-1)
+                        [x2 y2] (utils/get-record-properties property-matrix fac-id-2)
                         annotation (new XYLineAnnotation x1 y1 x2 y2 stroke paint)]
                     (.addAnnotation (.getXYPlot chart) annotation)
                     chart))]
     (reduce reducer chart edges)))
+
+(defn- annotate-chart-with-circles!
+  [chart circles]
+  (doseq [{center :center radius :radius} circles]
+    (let [height (* radius 2) width (* radius 2)
+          top-left-x (- (first center) radius)
+          top-left-y (- (second center) radius)
+          shape (java.awt.geom.Ellipse2D$Double. top-left-x top-left-y width height)
+          stroke (new BasicStroke 2.0)
+          outline-paint Color/BLUE
+          circle (new XYShapeAnnotation shape stroke outline-paint)]
+      (.addAnnotation (.getXYPlot chart) circle)))
+  chart)
 
 (defn build-initial
   [property-matrix]
@@ -142,7 +151,7 @@
     (save-chart
       (let [x-serie (range (count functionals))
             y-serie (map :val functionals)
-            categories [:B :R :G :H]
+            categories [:D :R :G :H]
             chart (incanter.charts/line-chart
                    x-serie y-serie
                    :legend true
@@ -154,7 +163,26 @@
            x-serie (map category functionals)
            :series-label (str (name category) " компонента")))
         chart)
-      "target/cancer-functionals.png" )))
+      "target/cancer-functionals.png")))
+
+(defn build-trout
+  [property-matrix]
+  (let [{:keys [initial-sphere spheres-built]} (trout property-matrix)
+        circles (map :sphere spheres-built)
+        groups (map :separates spheres-built)
+        groups-count (count groups)
+        group-by-serie (map #(utils/get-group-number groups (first %)) property-matrix)]
+    (save-chart
+     (-> (incanter.charts/scatter-plot
+          (map second property-matrix)
+          (map #(get % 2) property-matrix)
+          :title (format "Результати алгоритму ФОРЕЛЬ (кількість груп: %d)" groups-count)
+          :x-label "Відсоток з усіма атестаціями"
+          :y-label "Відсоток з 3ма неатестаціями"
+          :group-by group-by-serie)
+         (annotate-scatter-chart-with-names! property-matrix)
+         (annotate-chart-with-circles! circles))
+     "target/trout.png")))
 
 (defn build-dataset [dataset]
   (let [property-matrix (dataset->property-matrix dataset)
@@ -164,7 +192,8 @@
 
     (build-initial property-matrix)
     (build-spectr distance-map)
-    (build-cancer property-matrix distance-graph)))
+    (build-cancer property-matrix distance-graph)
+    (build-trout property-matrix)))
 
 (def dataset (load-dataset "resources/lab1/faculties.edn"))
 
