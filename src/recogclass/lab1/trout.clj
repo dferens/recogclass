@@ -5,7 +5,8 @@
 (defprotocol SphereProtocol
   (is-point-inside [this point])
   (rand-point-inside [this])
-  (get-points-inside [this points-lookup]))
+  (get-points-inside [this points-lookup])
+  (contains-points? [this points-lookup]))
 
 (defrecord Sphere [center radius]
   SphereProtocol
@@ -20,13 +21,16 @@
     [(+ (first center) (* (Math/cos angle) distance))
      (+ (second center) (* (Math/sin angle) distance))]))
   (get-points-inside
-   [this points-lookup]
-   (let [points-inside-keys
-         (for [key (keys points-lookup)
-               :let [point (get points-lookup key)]
-               :when (is-point-inside this point)]
-           key)]
-     (select-keys points-lookup points-inside-keys))))
+    [this points-lookup]
+    (let [points-inside-keys
+          (for [key (keys points-lookup)
+                :let [point (get points-lookup key)]
+                :when (is-point-inside this point)]
+            key)]
+      (select-keys points-lookup points-inside-keys)))
+  (contains-points?
+    [this points-lookup]
+    (some #(is-point-inside this %) (vals points-lookup))))
 
 (defn- property-matrix->points-lookup
   "Returns map of format:
@@ -99,10 +103,18 @@
         (if (= (-> current-points-inside-lookup keys set)
                (-> new-points-inside-lookup keys set))
           [new-sphere new-points-inside-lookup]
-          (do
-            (prn current-points-inside-lookup new-points-inside-lookup)
-            (prn current-sphere new-sphere)
-            (recur new-sphere)))))))
+          (recur new-sphere))))))
+
+(defn- get-start-trout-sphere
+  "Returns random sphere inside current one with given radius which has
+  any points inside."
+  [current-sphere points-lookup radius]
+  (loop []
+    (let [new-sphere-center (rand-point-inside current-sphere)
+          new-sphere (->Sphere new-sphere-center radius)]
+      (if (contains-points? new-sphere points-lookup)
+        new-sphere
+        (recur)))))
 
 (defn trout
   "Splits input objects into groups using trout algorithm.
@@ -121,8 +133,10 @@
         {:initial-sphere initial-sphere
          :spheres-built spheres-built}
         (let [current-start-sphere (get-sphere-of-points points-left-lookup)
-              new-sphere-center (rand-point-inside current-start-sphere)
-              start-sphere (->Sphere new-sphere-center search-sphere-radius)
+              start-sphere (get-start-trout-sphere
+                             current-start-sphere
+                             points-left-lookup
+                             search-sphere-radius)
               [final-sphere final-points-inside-lookup]
               (get-final-trout-sphere start-sphere points-left-lookup)]
           (recur

@@ -166,7 +166,7 @@
 
 (defn build-trout
   [property-matrix]
-  (doseq [ratio-string ["0.9" "0.6" "0.4"]]
+  (doseq [ratio-string ["0.9" "0.6" "0.4" "0.25"]]
     (let [ratio (Float/parseFloat ratio-string)
           {:keys [initial-sphere spheres-built]} (trout property-matrix ratio)
           circles (map :sphere spheres-built)
