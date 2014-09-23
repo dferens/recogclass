@@ -5,8 +5,10 @@
            org.jfree.chart.annotations.XYLineAnnotation
            org.jfree.chart.annotations.XYShapeAnnotation)
   (:require [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [incanter.core]
             [incanter.charts]
+            [incanter.stats]
             [recogclass.lab1.cancer :refer [cancer]]
             [recogclass.lab1.spectr :refer [spectr]]
             [recogclass.lab1.trout :refer [trout] :reload true]
@@ -38,12 +40,12 @@
    [faculty1-id faculty2-id 0.123]
    [faculty2-id faculty1-id 0.456]
     ...]"
-  [property-matrix]
+  [property-matrix metric-func]
   (for [record-a property-matrix
         record-b property-matrix
         :let [id-a (first record-a) vec-a (rest record-a)
               id-b (first record-b) vec-b (rest record-b)]]
-    [id-a id-b (utils/calc-decart-distance vec-a vec-b)]))
+    [id-a id-b (metric-func vec-a vec-b)]))
 
 (defn distance-matrix->distance-map
   "Converts distance matrix to map like:
@@ -126,7 +128,7 @@
    "target/scatter.png"))
 
 (defn build-spectr
-  [distance-map]
+  [distance-map output-dir]
   (let [spectr-result (spectr distance-map)]
     (save-chart
      (incanter.charts/line-chart
@@ -135,10 +137,10 @@
       :title "Результати алгоритму СПЕКТР"
       :x-label "Факультети"
       :y-label "Значення спектра")
-     "target/spectr.png")))
+     (str output-dir "spectr.png"))))
 
 (defn build-cancer
-  [property-matrix distance-graph]
+  [property-matrix distance-graph output-dir]
   (let [[cancer-groups cancer-edges functionals] (cancer distance-graph)
         groups-count (count cancer-groups)]
     (save-chart
@@ -151,7 +153,7 @@
              :group-by group-by-serie)
             (annotate-chart-with-names! property-matrix)
             (annotate-chart-with-edges! cancer-edges property-matrix)))
-      "target/cancer.png")
+      (str output-dir "cancer.png"))
     (save-chart
       (let [x-serie (range (count functionals))
             y-serie (map :val functionals)
@@ -166,10 +168,10 @@
            x-serie (map category functionals)
            :series-label (str (name category) " компонента")))
         chart)
-      "target/cancer-functionals.png")))
+      (str output-dir "cancer-functionals.png"))))
 
 (defn build-trout
-  [property-matrix]
+  [property-matrix output-dir]
   (doseq [ratio-string ["0.9" "0.6" "0.4" "0.25"]]
     (let [ratio (Float/parseFloat ratio-string)
           {:keys [initial-sphere spheres-built]} (trout property-matrix ratio)
@@ -187,10 +189,10 @@
            (annotate-chart-with-names! property-matrix)
            (annotate-chart-with-circles! [initial-sphere] Color/RED)
            (annotate-chart-with-circles! circles Color/BLUE))
-       (format "target/trout-%s.png" ratio-string)))))
+       (format "%strout-%s.png" output-dir ratio-string)))))
 
 (defn build-prims
-  [property-matrix distance-graph]
+  [property-matrix distance-graph output-dir]
   (let [[x-serie y-serie] (get-x-y-series property-matrix)
         mst-edges (loom.graph/edges (prims distance-graph))
         _ (prn mst-edges)]
@@ -201,19 +203,27 @@
            :y-label "Відсоток з 3ма неатестаціями")
           (annotate-chart-with-names! property-matrix)
           (annotate-chart-with-edges! mst-edges property-matrix))
-      "target/prims.png")))
+      (str output-dir "prims.png"))))
+
+(def metrics
+  [{:name "decart" :func incanter.stats/euclidean-distance}
+   {:name "cosine" :func (comp dec incanter.stats/cosine-similarity)}
+   {:name "corr" :func incanter.stats/correlation}])
 
 (defn build-dataset [dataset]
-  (let [property-matrix (dataset->property-matrix dataset)
-        distance-matrix (property-matrix->distance-matrix property-matrix)
-        distance-map (distance-matrix->distance-map distance-matrix)
-        distance-graph (distance-map->distance-graph distance-map)]
-
+  (let [property-matrix (dataset->property-matrix dataset)]
     (build-initial property-matrix)
-    (build-spectr distance-map)
-    (build-cancer property-matrix distance-graph)
-    (build-trout property-matrix)
-    (build-prims property-matrix distance-graph)))
+    (for [metric metrics]
+      (let [dir (format "target/%s/" (metric :name))
+            distance-matrix (property-matrix->distance-matrix property-matrix (metric :func))
+            distance-map (distance-matrix->distance-map distance-matrix)
+            distance-graph (distance-map->distance-graph distance-map)]
+        (.mkdir (io/file dir))
+        (prn distance-matrix)
+        (build-spectr distance-map dir)
+        (build-cancer property-matrix distance-graph dir)
+        (build-trout property-matrix dir)
+        (build-prims property-matrix distance-graph dir)))))
 
 (def dataset (load-dataset "resources/lab1/faculties.edn"))
 

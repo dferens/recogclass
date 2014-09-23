@@ -3,14 +3,6 @@
             [loom.alg]
             [loom.graph]))
 
-
-(defn calc-decart-distance
-  "Calculates Decart distance of two vectors"
-  [vec-a vec-b]
-  (->> (map #(Math/pow (- %1 %2) 2) vec-a vec-b)
-       (reduce +)
-       (Math/sqrt)))
-
 (defn get-record-properties
   [property-matrix record-id]
   (->> property-matrix

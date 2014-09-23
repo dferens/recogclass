@@ -1,5 +1,6 @@
 (ns recogclass.lab1.trout
-  (:require [recogclass.lab1.utils :as utils]))
+  (:require [incanter.stats]
+            [recogclass.lab1.utils :as utils]))
 
 
 (defprotocol SphereProtocol
@@ -12,7 +13,7 @@
   SphereProtocol
   (is-point-inside
    [this point]
-   (<= (utils/calc-decart-distance point center)
+   (<= (incanter.stats/euclidean-distance point center)
        radius))
   (rand-point-inside
    [this]
@@ -49,7 +50,7 @@
     (let [current-point (nth points-coords current-point-index nil)]
       (if (nil? current-point)
         current-max-radius
-        (let [new-radius (utils/calc-decart-distance center current-point)]
+        (let [new-radius (incanter.stats/euclidean-distance center current-point)]
           (if (or (nil? current-max-radius)
                   (> new-radius current-max-radius))
             (recur (inc current-point-index) new-radius)
@@ -71,7 +72,7 @@
    (get-most-far-point points-lookup (first (vals points-lookup))))
   ([points-lookup from-point]
    (reduce (fn [[most-far-point most-far-distance] next-point]
-             (let [new-distance (utils/calc-decart-distance from-point next-point)]
+             (let [new-distance (incanter.stats/euclidean-distance from-point next-point)]
                (if (or (nil? most-far-point)
                        (> new-distance most-far-distance))
                  [next-point new-distance]
@@ -87,7 +88,7 @@
     (let [[point-a _] (get-most-far-point points-lookup)
           [point-b _] (get-most-far-point points-lookup point-a)
           center (map #(+ %1 (/ (- %2 %1) 2)) point-a point-b)
-          radius (/ (utils/calc-decart-distance point-a point-b) 2)]
+          radius (/ (incanter.stats/euclidean-distance point-a point-b) 2)]
       (->Sphere center radius))))
 
 (defn- get-final-trout-sphere
