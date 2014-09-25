@@ -207,8 +207,7 @@
 
 (def metrics
   [{:name "decart" :func incanter.stats/euclidean-distance}
-   {:name "cosine" :func (comp dec incanter.stats/cosine-similarity)}
-   {:name "corr" :func incanter.stats/correlation}])
+   {:name "cosine" :func (comp #(- 1 %) incanter.stats/cosine-similarity)}])
 
 (defn build-dataset [dataset]
   (let [property-matrix (dataset->property-matrix dataset)]
